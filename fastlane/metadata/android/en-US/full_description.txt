@@ -1,0 +1,39 @@
+Oistars Billings provides enterprise-grade financial management, invoice lifecycle tracking, recurring subscription billing, and merchant settlement payouts tailored for European businesses and modern digital merchants.
+
+Engineered with Kotlin and Jetpack Compose, Oistars Billings delivers an offline-first, sovereign accounting experience backed by an encrypted local Room SQLite database with optional cloud sync and telemetry.
+
+KEY CAPABILITIES
+
+1. Invoicing & Receivables Management
+• Generate, issue, and reconcile professional invoices with configurable payment terms.
+• Full European VAT compliance support with customizable tax rates (0%, 9%, 21%).
+• Instant PDF generation with automated digital signature hashing (SHA-256) and shareable receipts.
+• Filter and track invoices across all states: Draft, Pending, Paid, and Overdue.
+
+2. Recurring Subscriptions & MRR Analytics
+• Manage subscription plans across weekly, monthly, quarterly, and annual billing cadences.
+• Track core financial metrics: Monthly Recurring Revenue (MRR), Annual Recurring Revenue (ARR), Churn Rate, and Active Subscriber counts.
+• Automated billing interval calculations with next-due-date projections and renewal statuses.
+
+3. Merchant Settlement Payouts & AML Protection
+• Disburse settled merchant balances via SEPA Direct Bank Transfers and express payouts.
+• Automated compliance validation with anti-money laundering (AML) and sanctions blacklist verification.
+• Real-time ledger accounting: track available balance, pending settlements, cleared reserves, and completed disbursements.
+
+4. Client Store Directory & Relationship Ledger
+• Maintain a comprehensive client database with registered addresses, VAT identifiers, and contact details.
+• Instant access to per-client lifetime value (LTV), transaction counts, and issued invoice histories.
+• Rapid customer lookup with real-time multi-field search and sorting.
+
+5. Sovereign Data Security & Privacy
+• Offline-first architecture: core financial records are stored securely on-device using Android Room SQLite.
+• Strict Google Play Data Safety compliance: zero personal data selling, zero behavioral advertising trackers, and transparent data deletion controls.
+• Production error tracking and network latency observability powered by Firebase Crashlytics and Performance Monitoring.
+
+6. Open Source & Verifiable
+• Open source under the Apache License, Version 2.0.
+• Built with Material Design 3 and adaptive layout support for smartphones, foldables, and tablets.
+
+Maintainer: Jurgen Paul Westerveld
+Organization: Oistars International B.V., Amsterdam, The Netherlands
+License: Apache License 2.0

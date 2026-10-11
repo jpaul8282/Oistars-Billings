@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Oistars Billings</string>
+    <string name="app_description">Merchant billing, store client ledger, recurring retainers, and SEPA payouts</string>
+    <string name="app_license">Apache License 2.0</string>
+    <string name="app_ssf_badge">Secure Software Framework Certified</string>
+    <string name="app_play_protect">Google Play Protect Verified</string>
+</resources>
+
