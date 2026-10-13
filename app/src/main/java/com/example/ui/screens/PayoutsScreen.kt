@@ -138,6 +138,7 @@ fun PayoutsScreen(
     onRetryPayout: (PayoutEntity) -> Unit = {},
     onUpdateAndRetryPayout: (PayoutEntity, String, String, String, String, String) -> Unit = { _, _, _, _, _, _ -> },
     onBatchRetryPayouts: () -> Unit = {},
+    onFixPayoutError: (PayoutEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showRequestSheet by remember { mutableStateOf(false) }
@@ -198,7 +199,8 @@ fun PayoutsScreen(
                     onRequestPayout = { showRequestSheet = true },
                     onViewAllPayouts = { onFilterChange("ALL") },
                     onProcessPayout = onProcessPayout,
-                    onCompletePayout = onCompletePayout
+                    onCompletePayout = onCompletePayout,
+                    onFixPayoutError = onFixPayoutError
                 )
             }
 
@@ -335,6 +337,19 @@ fun PayoutsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Button(
+                                    onClick = { primaryFailed?.let { onFixPayoutError(it) } },
+                                    colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .testTag("fix_payout_error_button")
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Fix Payout Error", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
                                     onClick = { showTransactionErrorInspector = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = StatusOverdue),
                                     shape = RoundedCornerShape(10.dp),
@@ -342,17 +357,17 @@ fun PayoutsScreen(
                                 ) {
                                     Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Inspect Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
 
                                 OutlinedButton(
                                     onClick = onBatchRetryPayouts,
                                     shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(0.9f)
                                 ) {
                                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp), tint = OceanBlue)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retry All (${failedPayouts.size})", fontSize = 12.sp, color = OceanBlue, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Retry (${failedPayouts.size})", fontSize = 12.sp, color = OceanBlue, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -580,7 +595,8 @@ fun PayoutsScreen(
                         onCancel = { payoutToCancel = payout },
                         onRetry = { onRetryPayout(payout) },
                         onEditAndRetry = { payoutToEditAndRetry = payout },
-                        onInspectError = { showTransactionErrorInspector = true }
+                        onInspectError = { showTransactionErrorInspector = true },
+                        onFixError = { onFixPayoutError(payout) }
                     )
                 }
             }
@@ -686,6 +702,9 @@ fun PayoutsScreen(
         TransactionErrorInspectorDialog(
             failedPayouts = failedPayouts,
             onDismiss = { showTransactionErrorInspector = false },
+            onFixSingle = { payout ->
+                onFixPayoutError(payout)
+            },
             onRetrySingle = { payout ->
                 onRetryPayout(payout)
             },
@@ -897,7 +916,8 @@ fun PayoutItemCard(
     onCancel: () -> Unit,
     onRetry: () -> Unit = {},
     onEditAndRetry: () -> Unit = {},
-    onInspectError: () -> Unit = {}
+    onInspectError: () -> Unit = {},
+    onFixError: () -> Unit = {}
 ) {
     val statusEnum = PayoutStatus.fromString(payout.status)
     val (statusBg, statusFg) = when (statusEnum) {
@@ -1068,6 +1088,18 @@ fun PayoutItemCard(
                 // Quick Status Advance Buttons
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (payout.status == "FAILED") {
+                        Button(
+                            onClick = onFixError,
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("fix_payout_error_${payout.id}")
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Fix Error", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
                         FilledTonalButton(
                             onClick = onEditAndRetry,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -1075,7 +1107,7 @@ fun PayoutItemCard(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Fix & Retry", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Edit & Retry", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
@@ -1674,6 +1706,7 @@ fun EditAndRetryPayoutDialog(
 fun TransactionErrorInspectorDialog(
     failedPayouts: List<PayoutEntity>,
     onDismiss: () -> Unit,
+    onFixSingle: (PayoutEntity) -> Unit = {},
     onRetrySingle: (PayoutEntity) -> Unit,
     onEditAndRetry: (PayoutEntity) -> Unit,
     onCancelSingle: (PayoutEntity) -> Unit,
@@ -1802,26 +1835,28 @@ fun TransactionErrorInspectorDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Button(
+                                    onClick = { onFixSingle(payout) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("fix_payout_error_dialog_button")
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Fix Error", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                FilledTonalButton(
                                     onClick = { onEditAndRetry(payout) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = OceanBlue),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Fix & Retry", fontSize = 11.sp)
-                                }
-
-                                FilledTonalButton(
-                                    onClick = { onRetrySingle(payout) },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Quick Retry", fontSize = 11.sp)
+                                    Text("Edit & Retry", fontSize = 11.sp)
                                 }
 
                                 OutlinedButton(
@@ -1838,25 +1873,26 @@ fun TransactionErrorInspectorDialog(
             }
         },
         confirmButton = {
-            if (failedPayouts.size > 1) {
-                Button(
-                    onClick = onBatchRetryAll,
-                    colors = ButtonDefaults.buttonColors(containerColor = OceanBlue)
-                ) {
-                    Text("Batch Retry All (${failedPayouts.size})")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (failedPayouts.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            failedPayouts.forEach { onFixSingle(it) }
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                        modifier = Modifier.testTag("fix_all_payout_errors_button")
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Fix All (${failedPayouts.size})")
+                    }
                 }
-            } else {
-                TextButton(onClick = onDismiss) {
-                    Text("Dismiss")
-                }
-            }
-        },
-        dismissButton = {
-            if (failedPayouts.size > 1) {
                 TextButton(onClick = onDismiss) {
                     Text("Close")
                 }
             }
-        }
+        },
+        dismissButton = {}
     )
 }

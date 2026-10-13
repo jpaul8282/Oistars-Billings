@@ -74,7 +74,9 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.util.clearFocusOnTap
 import com.example.data.local.ClientEntity
 import com.example.data.local.InvoiceEntity
+import com.example.data.local.SubscriptionEntity
 import com.example.data.model.InvoiceStatus
+import com.example.ui.components.ClientProfileDialog
 import com.example.ui.components.Formatters
 import com.example.ui.components.SearchBar
 import com.example.ui.components.StatusBadge
@@ -113,6 +115,8 @@ fun ClientsScreen(
     ) -> Unit,
     onDeleteClient: (ClientEntity) -> Unit,
     onCreateInvoiceForClient: (ClientEntity) -> Unit,
+    subscriptions: List<SubscriptionEntity> = emptyList(),
+    onGenerateFromSubscription: ((SubscriptionEntity) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -428,24 +432,24 @@ fun ClientsScreen(
 
     viewingClientDetails?.let { client ->
         val clientInvoices = invoices.filter { it.clientId == client.id }
-        val stats = clientMetricsMap[client.id] ?: ClientInvoiceStats()
-        ClientDetailDialog(
+        ClientProfileDialog(
             client = client,
-            stats = stats,
             invoices = clientInvoices,
+            subscriptions = subscriptions,
             onDismiss = { viewingClientDetails = null },
-            onEdit = {
+            onEditClient = {
                 viewingClientDetails = null
                 editingClient = client
             },
-            onDelete = {
+            onDeleteClient = {
                 onDeleteClient(client)
                 viewingClientDetails = null
             },
             onCreateInvoice = {
                 viewingClientDetails = null
                 onCreateInvoiceForClient(client)
-            }
+            },
+            onGenerateInvoiceFromSubscription = onGenerateFromSubscription
         )
     }
 }

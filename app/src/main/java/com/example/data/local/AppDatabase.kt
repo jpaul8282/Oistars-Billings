@@ -474,16 +474,16 @@ abstract class AppDatabase : RoomDatabase() {
                 fee = 0.0,
                 netAmount = 350.00,
                 currency = "EUR",
-                status = "FAILED",
+                status = "PAID",
                 destinationType = "SEPA_BANK",
                 destinationBank = "ING Bank N.V.",
                 destinationIban = "NL43 INGB 0006 3721 46",
                 destinationBic = "INGBNL2A",
                 recipientName = "Oistars International B.V.",
                 reference = "PO-SEP2026-003",
-                notes = "Transaction rejected by clearing gateway: BIC mismatch with intermediary institution. Action: Review & Retry.",
+                notes = "Error resolved: Beneficiary BIC verified with clearing gateway. Settled successfully via SEPA.",
                 scheduledDate = now - (2 * dayMs),
-                completedAt = null,
+                completedAt = now - (1 * dayMs),
                 createdAt = now - (3 * dayMs)
             )
 

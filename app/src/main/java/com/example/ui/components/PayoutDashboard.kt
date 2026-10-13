@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Schedule
@@ -129,10 +131,15 @@ fun PayoutDashboard(
     onViewAllPayouts: () -> Unit = {},
     onProcessPayout: (PayoutEntity) -> Unit = {},
     onCompletePayout: (PayoutEntity) -> Unit = {},
+    onFixPayoutError: (PayoutEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var chartType by remember { mutableStateOf(PayoutChartType.AREA_FLOW) }
     var selectedTimeframeMonths by remember { mutableIntStateOf(6) } // 3, 6, or 12 months
+
+    val failedPayouts = remember(payouts) {
+        payouts.filter { it.status.equals("FAILED", ignoreCase = true) }
+    }
 
     // Aggregate monthly buckets for Recharts visualization
     val historyBuckets = remember(payouts, selectedTimeframeMonths) {
@@ -228,6 +235,64 @@ fun PayoutDashboard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+            }
+
+            // Settlement Error Alert Banner if any failed transactions exist
+            if (failedPayouts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    color = StatusOverdueBg,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, StatusOverdue.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("payout_dashboard_error_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.ErrorOutline,
+                                contentDescription = "Payout Error",
+                                tint = StatusOverdue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "${failedPayouts.size} Payout Settlement Error Detected",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = StatusOverdue
+                                )
+                                Text(
+                                    text = "${failedPayouts.first().id} • ${failedPayouts.first().notes.take(45)}...",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { onFixPayoutError(failedPayouts.first()) },
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("fix_payout_error_dashboard")
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Fix Error", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

@@ -292,6 +292,7 @@ fun MainBillingApp(
                         onRequestPayout = { currentDestination = NavigationDestination.PAYOUTS },
                         onProcessPayout = { viewModel.processPayout(it) },
                         onCompletePayout = { viewModel.completePayout(it) },
+                        onFixPayoutError = { viewModel.fixPayoutError(it) },
                         onMarkAsPaid = { viewModel.markInvoiceAsPaid(it) },
                         onRecordPayment = { inv, amt, method, ref, notes ->
                             viewModel.recordInvoicePayment(inv, amt, method, ref, notes)
@@ -328,6 +329,7 @@ fun MainBillingApp(
                         onCancelPayout = { viewModel.cancelPayout(it) },
                         onDeletePayout = { viewModel.deletePayout(it) },
                         onRetryPayout = { viewModel.retryPayout(it) },
+                        onFixPayoutError = { viewModel.fixPayoutError(it) },
                         onUpdateAndRetryPayout = { payout, bank, iban, bic, recipient, notes ->
                             viewModel.updateAndRetryPayout(payout, bank, iban, bic, recipient, notes)
                         },
@@ -368,6 +370,7 @@ fun MainBillingApp(
                     ClientsScreen(
                         clients = clients,
                         invoices = invoices,
+                        subscriptions = subscriptions,
                         onSaveClient = { id, name, contact, email, phone, tax, address, country, currency, terms, notes ->
                             viewModel.saveClient(id, name, contact, email, phone, tax, address, country, currency, terms, notes)
                         },
@@ -375,7 +378,8 @@ fun MainBillingApp(
                         onCreateInvoiceForClient = { client ->
                             clientForNewInvoice = client
                             showCreateInvoiceSheet = true
-                        }
+                        },
+                        onGenerateFromSubscription = { viewModel.generateInvoiceFromSubscription(it) }
                     )
                 }
 

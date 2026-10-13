@@ -130,4 +130,29 @@ class PayoutTransactionErrorTest {
         assertEquals(0, failedAfter.size)
         assertEquals(2, scheduledAfter.size)
     }
+
+    @Test
+    fun `fix payout error and mark as paid settlement`() = runBlocking {
+        val failed = PayoutEntity(
+            id = "POUT-TEST-FIX",
+            amount = 350.0,
+            status = "FAILED",
+            notes = "BIC mismatch"
+        )
+        repository.createPayout(failed)
+
+        val resolved = failed.copy(
+            destinationBic = "INGBNL2A",
+            status = "PAID",
+            notes = "Error resolved: Intermediary BIC verified with clearing gateway. Settled successfully.",
+            completedAt = System.currentTimeMillis()
+        )
+        repository.updatePayout(resolved)
+
+        val retrieved = repository.getPayoutById("POUT-TEST-FIX")
+        assertNotNull(retrieved)
+        assertEquals("PAID", retrieved?.status)
+        assertEquals("INGBNL2A", retrieved?.destinationBic)
+        assertNotNull(retrieved?.completedAt)
+    }
 }

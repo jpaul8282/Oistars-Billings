@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,9 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
@@ -70,8 +73,11 @@ import com.example.ui.theme.AccentGold
 import com.example.ui.theme.NavyDark
 import com.example.ui.theme.OceanBlue
 import com.example.ui.theme.StatusOverdue
+import com.example.ui.theme.StatusOverdueBg
 import com.example.ui.theme.StatusPaid
+import com.example.ui.theme.StatusPaidBg
 import com.example.ui.theme.StatusPending
+import com.example.ui.theme.StatusPendingBg
 import com.example.ui.viewmodel.FinancialMetrics
 
 @Composable
@@ -92,6 +98,7 @@ fun DashboardScreen(
     onRequestPayout: () -> Unit = onNavigateToPayouts,
     onProcessPayout: (PayoutEntity) -> Unit = {},
     onCompletePayout: (PayoutEntity) -> Unit = {},
+    onFixPayoutError: (PayoutEntity) -> Unit = {},
     onMarkAsPaid: (InvoiceEntity) -> Unit,
     onRecordPayment: (InvoiceEntity, Double, String, String, String) -> Unit,
     onDeleteInvoice: (InvoiceEntity) -> Unit,
@@ -315,7 +322,8 @@ fun DashboardScreen(
             onRequestPayout = onRequestPayout,
             onViewAllPayouts = onNavigateToPayouts,
             onProcessPayout = onProcessPayout,
-            onCompletePayout = onCompletePayout
+            onCompletePayout = onCompletePayout,
+            onFixPayoutError = onFixPayoutError
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -488,6 +496,239 @@ fun DashboardScreen(
                     onClick = { selectedInvoiceForDetail = invoice },
                     onMarkAsPaid = { onMarkAsPaid(invoice) }
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Recent Payout Disbursements Section
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Recent Payout Disbursements",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            TextButton(onClick = onNavigateToPayouts) {
+                Text(
+                    text = if (payouts.isNotEmpty()) "Manage Payouts (${payouts.size})" else "Manage Payouts",
+                    fontSize = 12.sp,
+                    color = OceanBlue
+                )
+            }
+        }
+
+        val failedPayouts = payouts.filter { it.status.equals("FAILED", ignoreCase = true) }
+        if (failedPayouts.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+                color = StatusOverdueBg,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, StatusOverdue.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("dashboard_payout_error_banner")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = "Payout Error",
+                            tint = StatusOverdue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "${failedPayouts.size} Payout Settlement Error Detected",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = StatusOverdue
+                            )
+                            Text(
+                                text = "${failedPayouts.first().id} • ${failedPayouts.first().notes.take(45)}...",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = { onFixPayoutError(failedPayouts.first()) },
+                        colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.testTag("fix_payout_error_button")
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Fix Error", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (payouts.isEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onRequestPayout() },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(OceanBlue.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = OceanBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "No Payout Disbursements Yet",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Request your first merchant settlement payout to transfer earnings to your bank.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = onRequestPayout,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("Disburse", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                payouts.take(4).forEach { payout ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToPayouts() }
+                            .testTag("dashboard_payout_item_${payout.id}"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = payout.reference.ifBlank { payout.id },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    val isSuccess = payout.status.equals("PAID", true) || payout.status.equals("COMPLETED", true)
+                                    val isFailed = payout.status.equals("FAILED", true)
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = when {
+                                            isSuccess -> StatusPaidBg
+                                            isFailed -> StatusOverdueBg
+                                            else -> StatusPendingBg
+                                        }
+                                    ) {
+                                        Text(
+                                            text = payout.status.uppercase(),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = when {
+                                                isSuccess -> StatusPaid
+                                                isFailed -> StatusOverdue
+                                                else -> StatusPending
+                                            },
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    if (isFailed) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            color = StatusPaid,
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier
+                                                .clickable { onFixPayoutError(payout) }
+                                                .testTag("fix_payout_error_${payout.id}")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text("Fix", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${payout.destinationBank} • ${payout.recipientName.ifBlank { "Merchant Account" }}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (payout.destinationIban.isNotBlank()) {
+                                    Text(
+                                        text = "IBAN: ${payout.destinationIban.take(4)}••••${payout.destinationIban.takeLast(4)}",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = Formatters.formatCurrency(payout.amount, payout.currency),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OceanBlue
+                                )
+                                Text(
+                                    text = Formatters.formatDate(payout.scheduledDate),
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
