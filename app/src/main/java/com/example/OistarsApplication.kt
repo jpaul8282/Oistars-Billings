@@ -8,6 +8,8 @@ import com.google.firebase.perf.FirebasePerformance
 import com.google.firebase.perf.metrics.HttpMetric
 import com.google.firebase.perf.metrics.Trace
 
+import com.example.util.PayoutNotificationManager
+
 /**
  * Main application class for Oistars Billings.
  * Initializes Firebase, Firebase Crashlytics, and Firebase Performance Monitoring
@@ -19,6 +21,7 @@ class OistarsApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        PayoutNotificationManager.createNotificationChannel(this)
         initializeFirebase()
     }
 

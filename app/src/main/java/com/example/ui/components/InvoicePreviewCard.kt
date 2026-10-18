@@ -497,7 +497,7 @@ fun InvoicePreviewCard(
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Payment", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Checkout", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 

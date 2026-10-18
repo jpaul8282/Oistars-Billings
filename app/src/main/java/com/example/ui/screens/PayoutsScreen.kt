@@ -50,9 +50,13 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.SettingsEthernet
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
+import com.example.ui.components.PayoutConnectionDiagnosticsDialog
+import com.example.ui.viewmodel.PayoutConnectionInfo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -139,6 +143,9 @@ fun PayoutsScreen(
     onUpdateAndRetryPayout: (PayoutEntity, String, String, String, String, String) -> Unit = { _, _, _, _, _, _ -> },
     onBatchRetryPayouts: () -> Unit = {},
     onFixPayoutError: (PayoutEntity) -> Unit = {},
+    connectionInfo: PayoutConnectionInfo = PayoutConnectionInfo(),
+    onFixPayoutConnection: () -> Unit = {},
+    onTestPayoutConnection: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showRequestSheet by remember { mutableStateOf(false) }
@@ -147,6 +154,7 @@ fun PayoutsScreen(
     var payoutToDelete by remember { mutableStateOf<PayoutEntity?>(null) }
     var payoutToEditAndRetry by remember { mutableStateOf<PayoutEntity?>(null) }
     var showTransactionErrorInspector by remember { mutableStateOf(false) }
+    var showConnectionDiagnosticsSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isAuditingLedger by remember { mutableStateOf(false) }
     var auditScanResult by remember { mutableStateOf<String?>(null) }
@@ -1231,17 +1239,17 @@ fun RequestPayoutBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var amountText by remember { mutableStateOf(if (availableBalance > 0) String.format(java.util.Locale.US, "%.2f", availableBalance) else "100.00") }
+    var amountText by remember { mutableStateOf(if (availableBalance > 0) String.format(java.util.Locale.US, "%.2f", availableBalance) else "500.00") }
     var selectedType by remember { mutableStateOf(PayoutDestinationType.SEPA_BANK) }
     var bankName by remember { mutableStateOf("ING Bank N.V.") }
     var iban by remember { mutableStateOf("NL43 INGB 0006 3721 46") }
     var bic by remember { mutableStateOf("INGBNL2A") }
+    var paypalEmail by remember { mutableStateOf("westerveldjp@gmail.com") }
     var recipientName by remember { mutableStateOf("Jurgen Paul Westerveld") }
-    var notes by remember { mutableStateOf("Scheduled merchant store balance payout") }
+    var notes by remember { mutableStateOf("Scheduled merchant store balance payout checkout") }
     var isExpressTransfer by remember { mutableStateOf(false) }
 
     val sheetFocusManager = LocalFocusManager.current
-    val isBannedIban = false
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1261,7 +1269,7 @@ fun RequestPayoutBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Request Settlement Payout",
+                    text = "Merchant Payout Checkout",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -1277,6 +1285,37 @@ fun RequestPayoutBottomSheet(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
+                }
+            }
+
+            // Destination Method Selector Tabs
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    PayoutDestinationType.SEPA_BANK to "🏦 SEPA Bank",
+                    PayoutDestinationType.PAYPAL to "🅿️ PayPal Business",
+                    PayoutDestinationType.STRIPE_CONNECT to "💳 Instant Card"
+                ).forEach { (type, label) ->
+                    val isSel = selectedType == type
+                    Surface(
+                        color = if (isSel) OceanBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) OceanBlue else Color.Transparent),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedType = type }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSel) OceanBlue else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
 
@@ -1298,7 +1337,7 @@ fun RequestPayoutBottomSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(500.0, 1000.0, 2500.0, availableBalance).distinct().forEach { preset ->
+                    listOf(250.0, 500.0, 1000.0, if (availableBalance > 0) availableBalance else 1500.0).distinct().forEach { preset ->
                         if (preset > 0) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -1319,45 +1358,57 @@ fun RequestPayoutBottomSheet(
                 }
             }
 
-            // Recipient & Settlement Bank Details
+            // Recipient Entity
             OutlinedTextField(
                 value = recipientName,
                 onValueChange = { recipientName = it },
-                label = { Text("Beneficiary Entity") },
+                label = { Text("Beneficiary / Merchant Name") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Dynamic Inputs depending on selected payout method
+            if (selectedType == PayoutDestinationType.PAYPAL) {
                 OutlinedTextField(
-                    value = bankName,
-                    onValueChange = { bankName = it },
-                    label = { Text("Beneficiary Bank") },
+                    value = paypalEmail,
+                    onValueChange = { paypalEmail = it },
+                    label = { Text("PayPal Merchant Email") },
+                    supportingText = { Text("Instant settlement to your verified PayPal balance", fontSize = 11.sp, color = OceanBlue) },
                     singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = bankName,
+                        onValueChange = { bankName = it },
+                        label = { Text("Beneficiary Bank") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = bic,
+                        onValueChange = { bic = it },
+                        label = { Text("BIC / SWIFT") },
+                        singleLine = true,
+                        modifier = Modifier.weight(0.9f)
+                    )
+                }
+
                 OutlinedTextField(
-                    value = bic,
-                    onValueChange = { bic = it },
-                    label = { Text("BIC / SWIFT") },
+                    value = iban,
+                    onValueChange = { iban = it },
+                    label = { Text("Settlement IBAN") },
+                    supportingText = { Text("Verified SEPA IBAN for corporate disbursement", fontSize = 11.sp, color = OceanBlue) },
                     singleLine = true,
-                    modifier = Modifier.weight(0.9f)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
             OutlinedTextField(
-                value = iban,
-                onValueChange = { iban = it },
-                label = { Text("Settlement IBAN") },
-                supportingText = { Text("Verified SEPA IBAN for direct corporate disbursement", fontSize = 11.sp, color = OceanBlue) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("Memo / Internal Notes") },
+                label = { Text("Memo / Internal Reference") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1374,7 +1425,10 @@ fun RequestPayoutBottomSheet(
                     Icon(Icons.Default.Info, contentDescription = null, tint = OceanBlue, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Standard SEPA clearing takes 1 business day. Zero payout processing fees applied.",
+                        text = if (selectedType == PayoutDestinationType.PAYPAL)
+                            "PayPal Instant Settlement: Funds credited immediately upon clearing approval."
+                        else
+                            "Standard SEPA clearing takes 1 business day. Zero payout processing fees applied.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1384,17 +1438,21 @@ fun RequestPayoutBottomSheet(
             Spacer(modifier = Modifier.height(4.dp))
 
             val cleanIban = iban.replace("\\s+".toRegex(), "")
-            val isIbanFormatValid = cleanIban.length in 15..34
-            val isBicFormatValid = bic.trim().length in 8..11
+            val isIbanFormatValid = if (selectedType == PayoutDestinationType.PAYPAL) true else cleanIban.length in 15..34
+            val isBicFormatValid = if (selectedType == PayoutDestinationType.PAYPAL) true else bic.trim().length in 8..11
+            val isEmailValid = if (selectedType == PayoutDestinationType.PAYPAL) paypalEmail.contains("@") else true
+            val parsedAmount = amountText.toDoubleOrNull() ?: 0.0
 
             Button(
                 onClick = {
-                    val parsed = amountText.toDoubleOrNull() ?: 0.0
-                    if (parsed > 0 && !isBannedIban && isIbanFormatValid && isBicFormatValid) {
-                        onSubmit(parsed, selectedType.name, bankName, iban, bic, recipientName, notes)
+                    if (parsedAmount > 0 && isIbanFormatValid && isBicFormatValid && isEmailValid) {
+                        val effectiveBank = if (selectedType == PayoutDestinationType.PAYPAL) "PayPal Business" else bankName
+                        val effectiveIban = if (selectedType == PayoutDestinationType.PAYPAL) paypalEmail else iban
+                        val effectiveBic = if (selectedType == PayoutDestinationType.PAYPAL) "PAYPAL" else bic
+                        onSubmit(parsedAmount, selectedType.name, effectiveBank, effectiveIban, effectiveBic, recipientName, notes)
                     }
                 },
-                enabled = !isBannedIban && (amountText.toDoubleOrNull() ?: 0.0) > 0 && isIbanFormatValid && isBicFormatValid,
+                enabled = parsedAmount > 0 && isIbanFormatValid && isBicFormatValid && isEmailValid,
                 colors = ButtonDefaults.buttonColors(containerColor = OceanBlue),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier

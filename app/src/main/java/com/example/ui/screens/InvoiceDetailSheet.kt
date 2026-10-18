@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Share
@@ -78,6 +79,7 @@ fun InvoiceDetailSheet(
     onDelete: (InvoiceEntity) -> Unit
 ) {
     val context = LocalContext.current
+    var showCheckoutSheet by remember { mutableStateOf(false) }
     var showPaymentDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showExportPdfDialog by remember { mutableStateOf(false) }
@@ -379,18 +381,35 @@ fun InvoiceDetailSheet(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (invoice.balanceDue > 0.0) {
+                    // Primary Checkout & Pay Action
+                    Button(
+                        onClick = { showCheckoutSheet = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = OceanBlue),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("checkout_invoice_btn")
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Checkout & Pay Online (${Formatters.formatCurrency(invoice.balanceDue, invoice.currency)})",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { showPaymentDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("record_payment_btn")
                         ) {
-                            Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Record Payment")
                         }
@@ -401,7 +420,7 @@ fun InvoiceDetailSheet(
                                 .weight(1f)
                                 .testTag("mark_paid_btn")
                         ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Mark Fully Paid")
                         }
@@ -462,6 +481,17 @@ fun InvoiceDetailSheet(
                 }
             }
         }
+    }
+
+    if (showCheckoutSheet) {
+        InvoiceCheckoutSheet(
+            invoice = invoice,
+            onDismiss = { showCheckoutSheet = false },
+            onPaymentConfirmed = { amount, method, ref, notes ->
+                showCheckoutSheet = false
+                onRecordPayment(invoice, amount, method, ref, notes)
+            }
+        )
     }
 
     if (showExportPdfDialog) {

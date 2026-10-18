@@ -155,4 +155,62 @@ class PayoutTransactionErrorTest {
         assertEquals("INGBNL2A", retrieved?.destinationBic)
         assertNotNull(retrieved?.completedAt)
     }
+
+    @Test
+    fun `invoice payment checkout records transaction and clears invoice balance`() = runBlocking {
+        val invoice = com.example.data.local.InvoiceEntity(
+            id = "INV-CHK-001",
+            clientId = "CLI-01",
+            clientName = "Jurgen Paul Westerveld",
+            amount = 850.0,
+            status = "PENDING"
+        )
+        repository.saveInvoice(invoice)
+
+        // Process checkout transaction
+        repository.recordPayment(
+            invoice = invoice,
+            paymentAmount = 850.0,
+            paymentMethod = "PayPal Checkout",
+            transactionRef = "TRX-PAYPAL-98214",
+            notes = "Completed via Express Checkout"
+        )
+
+        val updated = repository.getInvoiceById("INV-CHK-001")
+        assertNotNull(updated)
+        assertEquals("PAID", updated?.status)
+        assertEquals(850.0, updated?.amountPaid ?: 0.0, 0.01)
+
+        val payments = repository.allPayments.first()
+        val matchingPayment = payments.firstOrNull { it.invoiceId == "INV-CHK-001" }
+        assertNotNull(matchingPayment)
+        assertEquals("PayPal Checkout", matchingPayment?.paymentMethod)
+        assertEquals("TRX-PAYPAL-98214", matchingPayment?.transactionRef)
+    }
+
+    @Test
+    fun `payout checkout with PayPal destination schedules successfully`() = runBlocking {
+        val paypalPayout = PayoutEntity(
+            id = "POUT-PAYPAL-01",
+            amount = 1200.0,
+            fee = 0.0,
+            netAmount = 1200.0,
+            currency = "EUR",
+            status = "SCHEDULED",
+            destinationType = "PAYPAL",
+            destinationBank = "PayPal Business",
+            destinationIban = "westerveldjp@gmail.com",
+            destinationBic = "PAYPAL",
+            recipientName = "Jurgen Paul Westerveld",
+            reference = "PO-PAYPAL-001",
+            notes = "Instant settlement to PayPal wallet"
+        )
+        repository.createPayout(paypalPayout)
+
+        val retrieved = repository.getPayoutById("POUT-PAYPAL-01")
+        assertNotNull(retrieved)
+        assertEquals("SCHEDULED", retrieved?.status)
+        assertEquals("PAYPAL", retrieved?.destinationType)
+        assertEquals("westerveldjp@gmail.com", retrieved?.destinationIban)
+    }
 }

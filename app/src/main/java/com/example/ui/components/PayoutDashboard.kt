@@ -37,6 +37,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SettingsEthernet
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -50,6 +55,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.ui.viewmodel.PayoutConnectionInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -132,10 +138,14 @@ fun PayoutDashboard(
     onProcessPayout: (PayoutEntity) -> Unit = {},
     onCompletePayout: (PayoutEntity) -> Unit = {},
     onFixPayoutError: (PayoutEntity) -> Unit = {},
+    connectionInfo: PayoutConnectionInfo = PayoutConnectionInfo(),
+    onFixPayoutConnection: () -> Unit = {},
+    onTestPayoutConnection: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var chartType by remember { mutableStateOf(PayoutChartType.AREA_FLOW) }
     var selectedTimeframeMonths by remember { mutableIntStateOf(6) } // 3, 6, or 12 months
+    var showConnectionDiagnostics by remember { mutableStateOf(false) }
 
     val failedPayouts = remember(payouts) {
         payouts.filter { it.status.equals("FAILED", ignoreCase = true) }
@@ -214,9 +224,14 @@ fun PayoutDashboard(
                     }
                 }
 
+                val isConnError = connectionInfo.hasError || !connectionInfo.isConnected
                 Surface(
-                    color = StatusPaidBg,
-                    shape = RoundedCornerShape(8.dp)
+                    color = if (isConnError) StatusOverdueBg else StatusPaidBg,
+                    border = BorderStroke(1.dp, if (isConnError) StatusOverdue.copy(alpha = 0.5f) else StatusPaid.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .clickable { showConnectionDiagnostics = true }
+                        .testTag("payout_connection_hub_badge")
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -226,15 +241,102 @@ fun PayoutDashboard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(StatusPaid)
+                                .background(if (isConnError) StatusOverdue else StatusPaid)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = "Active SEPA Hub",
-                            color = StatusPaid,
+                            text = if (isConnError) "Connection Error (${connectionInfo.latencyMs}ms)" else "Active SEPA Hub (${connectionInfo.latencyMs}ms)",
+                            color = if (isConnError) StatusOverdue else StatusPaid,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+            }
+
+            // Real-time Payout Gateway Connection Error Alert Banner
+            if (connectionInfo.hasError || !connectionInfo.isConnected) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    color = StatusOverdueBg,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, StatusOverdue.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("payout_connection_error_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(
+                                    Icons.Default.CloudOff,
+                                    contentDescription = "Payout Connection Error",
+                                    tint = StatusOverdue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Payout Connection Error Detected",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = StatusOverdue
+                                )
+                            }
+                            Surface(
+                                color = StatusOverdue,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "ACTION REQUIRED",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = connectionInfo.errorMessage ?: "Interbank clearing gateway returned a connection routing exception. Bank settlement handshake is stalled.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onFixPayoutConnection,
+                                colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .weight(1.1f)
+                                    .testTag("fix_payout_connection_dashboard_btn")
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Fix Payout Connection", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            OutlinedButton(
+                                onClick = { showConnectionDiagnostics = true },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(0.9f)
+                            ) {
+                                Icon(Icons.Default.SettingsEthernet, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Diagnostics", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -705,6 +807,18 @@ fun PayoutDashboard(
             }
         }
     }
+
+    if (showConnectionDiagnostics) {
+        PayoutConnectionDiagnosticsDialog(
+            connectionInfo = connectionInfo,
+            onDismiss = { showConnectionDiagnostics = false },
+            onTestConnection = onTestPayoutConnection,
+            onFixConnection = {
+                onFixPayoutConnection()
+                showConnectionDiagnostics = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -1097,4 +1211,173 @@ private fun generatePayoutHistoryBuckets(
     }
 
     return buckets
+}
+
+@Composable
+fun PayoutConnectionDiagnosticsDialog(
+    connectionInfo: PayoutConnectionInfo,
+    onDismiss: () -> Unit,
+    onTestConnection: () -> Unit,
+    onFixConnection: () -> Unit
+) {
+    val isError = connectionInfo.hasError || !connectionInfo.isConnected
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (isError) Icons.Default.CloudOff else Icons.Default.SettingsEthernet,
+                    contentDescription = null,
+                    tint = if (isError) StatusOverdue else StatusPaid,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Payout Gateway Connection",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (isError) {
+                    Surface(
+                        color = StatusOverdueBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, StatusOverdue.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Routing Exception Detected",
+                                fontWeight = FontWeight.Bold,
+                                color = StatusOverdue,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = connectionInfo.errorMessage ?: "Intermediary clearing gateway rejected transfer.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "Connected Settlement Rails",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                // Rail 1: SEPA ISO 20022
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("🏦 SEPA Interbank Hub", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("${connectionInfo.bankName} • ${connectionInfo.bicVerified}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(
+                            text = connectionInfo.sepaGatewayStatus,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = if (connectionInfo.sepaGatewayStatus.contains("Exception", ignoreCase = true) || connectionInfo.sepaGatewayStatus.contains("Error", ignoreCase = true)) StatusOverdue else StatusPaid
+                        )
+                    }
+                }
+
+                // Rail 2: PayPal Business
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("🅿️ PayPal Business API", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(connectionInfo.paypalAccount, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(
+                            text = connectionInfo.paypalGatewayStatus,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = StatusPaid
+                        )
+                    }
+                }
+
+                // Rail 3: Stripe Connect Instant
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("💳 Instant Card & Connect", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Direct debit / card settlement", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(
+                            text = connectionInfo.stripeConnectStatus,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = if (connectionInfo.stripeConnectStatus.contains("Degraded", ignoreCase = true)) StatusOverdue else StatusPaid
+                        )
+                    }
+                }
+
+                // Telemetry Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Clearing Latency: ${connectionInfo.latencyMs}ms", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("IBAN: ${connectionInfo.ibanMasked}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onFixConnection,
+                colors = ButtonDefaults.buttonColors(containerColor = StatusPaid),
+                modifier = Modifier.testTag("dialog_fix_connection_btn")
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Fix & Reconnect", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onTestConnection,
+                    modifier = Modifier.testTag("dialog_test_ping_btn")
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Test Ping")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        }
+    )
 }
